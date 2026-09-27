@@ -257,10 +257,13 @@ fi
 
 wait_http() {
   local url="$1" expected="${2:-200}" code="000"
-  for _ in {1..20}; do
-    code="$(curl -sS -m 5 -o /dev/null -w '%{http_code}' "$url" 2>/dev/null || true)"
+  # First boot after rebuilding the venv can take longer while Hermes creates
+  # its local state and warms imports. systemd may be active before port 9119
+  # is listening, so allow up to two minutes instead of reporting a false fail.
+  for _ in {1..60}; do
+    code="$(curl -sS --connect-timeout 2 -m 5 -o /dev/null -w '%{http_code}' "$url" 2>/dev/null || true)"
     [[ "$code" == "$expected" ]] && return 0
-    sleep 1
+    sleep 2
   done
   warn "$url returned HTTP $code (expected $expected)"
   return 1
